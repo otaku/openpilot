@@ -2,7 +2,7 @@ import copy
 from common.kalman.simple_kalman import KF1D
 from selfdrive.config import Conversions as CV
 from opendbc.can.parser import CANParser
-from selfdrive.car.subaru.values import DBC, STEER_THRESHOLD
+from selfdrive.car.subaru.values import CAR, DBC, STEER_THRESHOLD
 
 def get_powertrain_can_parser(CP):
   # this function generates lists for signal, messages and initial values
@@ -10,8 +10,6 @@ def get_powertrain_can_parser(CP):
     # sig_name, sig_address, default
     ("Steer_Torque_Sensor", "Steering_Torque", 0),
     ("Steering_Angle", "Steering_Torque", 0),
-    ("Cruise_On", "CruiseControl", 0),
-    ("Cruise_Activated", "CruiseControl", 0),
     ("Brake_Pedal", "Brake_Pedal", 0),
     ("Throttle_Pedal", "Throttle", 0),
     ("LEFT_BLINKER", "Dashlights", 0),
@@ -31,24 +29,44 @@ def get_powertrain_can_parser(CP):
   checks = [
     # sig_address, frequency
     ("Dashlights", 10),
-    ("CruiseControl", 20),
     ("Wheel_Speeds", 50),
     ("Steering_Torque", 50),
     ("BodyInfo", 10),
   ]
 
+  if CP.carFingerprint == CAR.IMPREZA:
+    signals += [
+      ("Cruise_On", "CruiseControl", 0),
+      ("Cruise_Activated", "CruiseControl", 0),
+    ]
+
+    checks += [
+      ("CruiseControl", 20),
+    ]
+
   return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0)
 
+def get_bus_one_can_parser(CP):
+  signals = []
+  checks = []
+
+  if CP.carFingerprint == CAR.CROSSTREK:
+    signals += [
+      # sig_name, sig_address, default
+      ("Cruise_Activated", "Cruise_Status", 0),
+    ]
+
+    checks += [
+      # sig_address, frequency 
+      ("Cruise_Status", 50),
+    ]
+
+  return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 1)
 
 def get_camera_can_parser(CP):
   signals = [
     ("Cruise_Set_Speed", "ES_DashStatus", 0),
-
-    ("Counter", "ES_Distance", 0),
-    ("Signal1", "ES_Distance", 0),
-    ("Signal2", "ES_Distance", 0),
-    ("Main", "ES_Distance", 0),
-    ("Signal3", "ES_Distance", 0),
+    ("Cruise_Activated", "ES_DashStatus", 0),
 
     ("Checksum", "ES_LKAS_State", 0),
     ("Counter", "ES_LKAS_State", 0),
@@ -72,12 +90,20 @@ def get_camera_can_parser(CP):
     ("Traffic_light_Ahead", "ES_LKAS_State", 0),
     ("Right_Depart", "ES_LKAS_State", 0),
     ("Signal5", "ES_LKAS_State", 0),
-
   ]
 
   checks = [
     ("ES_DashStatus", 10),
   ]
+
+  if CP.carFingerprint == CAR.IMPREZA:
+    signals += [
+      ("Counter", "ES_Distance", 0),
+      ("Signal1", "ES_Distance", 0),
+      ("Signal2", "ES_Distance", 0),
+      ("Main", "ES_Distance", 0),
+      ("Signal3", "ES_Distance", 0),
+    ]
 
   return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 2)
 
@@ -90,8 +116,10 @@ class CarState():
     self.car_fingerprint = CP.carFingerprint
     self.left_blinker_on = False
     self.prev_left_blinker_on = False
+    self.left_blinker_timer = 0
     self.right_blinker_on = False
     self.prev_right_blinker_on = False
+    self.right_blinker_timer = 0
     self.steer_torque_driver = 0
     self.steer_not_allowed = False
     self.main_on = False
@@ -104,7 +132,7 @@ class CarState():
                          K=[[0.12287673], [0.29666309]])
     self.v_ego = 0.
 
-  def update(self, cp, cp_cam):
+  def update(self, cp, cp_cam, bus_one):
 
     self.pedal_gas = cp.vl["Throttle"]['Throttle_Pedal']
     self.brake_pressure = cp.vl["Brake_Pedal"]['Brake_Pedal']
@@ -134,14 +162,25 @@ class CarState():
     self.a_ego = float(v_ego_x[1])
     self.standstill = self.v_ego_raw < 0.01
 
+    # Turn signal logic
+
     self.prev_left_blinker_on = self.left_blinker_on
     self.prev_right_blinker_on = self.right_blinker_on
-    self.left_blinker_on = cp.vl["Dashlights"]['LEFT_BLINKER'] == 1
-    self.right_blinker_on = cp.vl["Dashlights"]['RIGHT_BLINKER'] == 1
+
+    self.left_blinker_timer = 50 if cp.vl["Dashlights"]['LEFT_BLINKER'] == 1 else max(self.left_blinker_timer - 1, 0)
+    self.left_blinker_on = self.left_blinker_timer > 0
+
+    self.right_blinker_timer = 50 if cp.vl["Dashlights"]['RIGHT_BLINKER'] == 1 else max(self.right_blinker_timer - 1, 0)
+    self.right_blinker_on = self.right_blinker_timer > 0
+
     self.seatbelt_unlatched = cp.vl["Dashlights"]['SEATBELT_FL'] == 1
     self.steer_torque_driver = cp.vl["Steering_Torque"]['Steer_Torque_Sensor']
-    self.acc_active = cp.vl["CruiseControl"]['Cruise_Activated']
-    self.main_on = cp.vl["CruiseControl"]['Cruise_On']
+    if self.car_fingerprint == CAR.IMPREZA:
+      self.acc_active = cp.vl["CruiseControl"]['Cruise_Activated']
+      self.main_on = cp.vl["CruiseControl"]['Cruise_On']
+    elif self.car_fingerprint == CAR.CROSSTREK:
+      self.acc_active = bus_one.vl["Cruise_Status"]['Cruise_Activated']
+      self.main_on = self.acc_active
     self.steer_override = abs(self.steer_torque_driver) > STEER_THRESHOLD[self.car_fingerprint]
     self.angle_steers = cp.vl["Steering_Torque"]['Steering_Angle']
     self.door_open = any([cp.vl["BodyInfo"]['DOOR_OPEN_RR'],
@@ -149,5 +188,6 @@ class CarState():
       cp.vl["BodyInfo"]['DOOR_OPEN_FR'],
       cp.vl["BodyInfo"]['DOOR_OPEN_FL']])
 
-    self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
+    if self.car_fingerprint == CAR.IMPREZA:
+      self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
     self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])

@@ -4,7 +4,7 @@ from selfdrive.config import Conversions as CV
 from selfdrive.controls.lib.drive_helpers import create_event, EventTypes as ET
 from selfdrive.controls.lib.vehicle_model import VehicleModel
 from selfdrive.car.subaru.values import CAR
-from selfdrive.car.subaru.carstate import CarState, get_powertrain_can_parser, get_camera_can_parser
+from selfdrive.car.subaru.carstate import CarState, get_powertrain_can_parser, get_camera_can_parser, get_bus_one_can_parser
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
 from selfdrive.car.interfaces import CarInterfaceBase
 
@@ -23,6 +23,7 @@ class CarInterface(CarInterfaceBase):
     self.VM = VehicleModel(CP)
     self.pt_cp = get_powertrain_can_parser(CP)
     self.cam_cp = get_camera_can_parser(CP)
+    self.bus_one = get_bus_one_can_parser(CP)
 
     self.gas_pressed_prev = False
 
@@ -53,7 +54,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerRateCost = 0.7
     ret.steerLimitTimer = 0.4
 
-    if candidate in [CAR.IMPREZA]:
+    if candidate in [ CAR.IMPREZA, CAR.CROSSTREK ]:
       ret.mass = 1568. + STD_CARGO_KG
       ret.wheelbase = 2.67
       ret.centerToFront = ret.wheelbase * 0.5
@@ -97,13 +98,14 @@ class CarInterface(CarInterfaceBase):
   def update(self, c, can_strings):
     self.pt_cp.update_strings(can_strings)
     self.cam_cp.update_strings(can_strings)
+    self.bus_one.update_strings(can_strings)
 
-    self.CS.update(self.pt_cp, self.cam_cp)
+    self.CS.update(self.pt_cp, self.cam_cp, self.bus_one)
 
     # create message
     ret = car.CarState.new_message()
 
-    ret.canValid = self.pt_cp.can_valid and self.cam_cp.can_valid
+    ret.canValid = self.pt_cp.can_valid and self.cam_cp.can_valid and self.bus_one.can_valid
 
     # speeds
     ret.vEgo = self.CS.v_ego
