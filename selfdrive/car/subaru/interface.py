@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 from cereal import car
 from selfdrive.car.subaru.values import CAR
+from selfdrive.car.subaru.carstate import CarState
 from selfdrive.car import STD_CARGO_KG, scale_rot_inertia, scale_tire_stiffness, gen_empty_fingerprint
 from selfdrive.car.interfaces import CarInterfaceBase
 
 class CarInterface(CarInterfaceBase):
+  def __init__(self, CP, CarController, CarState):
+    super().__init__()
+
+    self.bus_one = CarState.get_bus_one_can_parser(CP)
 
   @staticmethod
   def compute_gb(accel, speed):
@@ -28,7 +33,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerRateCost = 0.7
     ret.steerLimitTimer = 0.4
 
-    if candidate in [CAR.IMPREZA]:
+    if candidate in [CAR.IMPREZA, CAR.CROSSTREK_HYBRID]:
       ret.mass = 1568. + STD_CARGO_KG
       ret.wheelbase = 2.67
       ret.centerToFront = ret.wheelbase * 0.5
@@ -52,10 +57,12 @@ class CarInterface(CarInterfaceBase):
   def update(self, c, can_strings):
     self.cp.update_strings(can_strings)
     self.cp_cam.update_strings(can_strings)
+    self.bus_one.update_strings(can_strings)
 
-    ret = self.CS.update(self.cp, self.cp_cam)
+    ret = self.CS.update(self.cp, self.cp_cam, self.bus_one)
 
-    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid
+    ret.canValid = self.cp.can_valid and self.cp_cam.can_valid and self.bus_one.can_valid
+
     ret.steeringRateLimited = self.CC.steer_rate_limited if self.CC is not None else False
 
     buttonEvents = []

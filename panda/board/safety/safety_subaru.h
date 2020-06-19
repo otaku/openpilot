@@ -80,8 +80,14 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
 
     // enter controls on rising edge of ACC, exit controls on ACC off
     if (((addr == 0x240) && subaru_global) ||
-        ((addr == 0x144) && !subaru_global)) {
-      int bit_shift = subaru_global ? 9 : 17;
+        ((addr == 0x144) && !subaru_global) ||
+        ((addr == 0x27) && (bus == 1) && subaru_global)) {
+      int bit_shift = -1;
+
+      if (addr == 0x240 && subaru_global) bit_shift = 9;
+      else if (addr == 0x144 && !subaru_global) bit_shift = 17;
+      else if (addr == 0x27 && subaru_global) bit_shift = 5;
+
       int cruise_engaged = ((GET_BYTES_48(to_push) >> bit_shift) & 1);
       if (cruise_engaged && !cruise_engaged_prev) {
         controls_allowed = 1;

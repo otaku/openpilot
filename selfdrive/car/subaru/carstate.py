@@ -4,7 +4,7 @@ from opendbc.can.can_define import CANDefine
 from selfdrive.config import Conversions as CV
 from selfdrive.car.interfaces import CarStateBase
 from opendbc.can.parser import CANParser
-from selfdrive.car.subaru.values import DBC, STEER_THRESHOLD
+from selfdrive.car.subaru.values import CAR, DBC, STEER_THRESHOLD
 
 
 class CarState(CarStateBase):
@@ -15,7 +15,7 @@ class CarState(CarStateBase):
     can_define = CANDefine(DBC[CP.carFingerprint]['pt'])
     self.shifter_values = can_define.dv["Transmission"]['Gear']
 
-  def update(self, cp, cp_cam):
+  def update(self, cp, cp_cam, bus_one):
     ret = car.CarState.new_message()
 
     ret.gas = cp.vl["Throttle"]['Throttle_Pedal'] / 255.
@@ -48,8 +48,12 @@ class CarState(CarStateBase):
     ret.steeringTorque = cp.vl["Steering_Torque"]['Steer_Torque_Sensor']
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD[self.car_fingerprint]
 
-    ret.cruiseState.enabled = cp.vl["CruiseControl"]['Cruise_Activated'] != 0
-    ret.cruiseState.available = cp.vl["CruiseControl"]['Cruise_On'] != 0
+    if self.car_fingerprint == CAR.IMPREZA:
+      ret.cruiseState.enabled = cp.vl["CruiseControl"]['Cruise_Activated'] != 0
+      ret.cruiseState.available = cp.vl["CruiseControl"]['Cruise_On'] != 0
+    elif self.car_fingerprint == CAR.CROSSTREK_HYBRID:
+      ret.cruiseState.enabled = bus_one.vl["Cruise_Status"]['Cruise_Activated'] != 0
+      ret.cruiseState.available = bus_one.vl["Cruise_Status"]['Cruise_Activated'] != 0
     ret.cruiseState.speed = cp_cam.vl["ES_DashStatus"]['Cruise_Set_Speed'] * CV.KPH_TO_MS
     # 1 = imperial, 6 = metric
     if cp.vl["Dash_State"]['Units'] == 1:
@@ -61,7 +65,8 @@ class CarState(CarStateBase):
       cp.vl["BodyInfo"]['DOOR_OPEN_FR'],
       cp.vl["BodyInfo"]['DOOR_OPEN_FL']])
 
-    self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
+    if self.car_fingerprint == CAR.IMPREZA:
+      self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
     self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
 
     return ret
@@ -103,18 +108,40 @@ class CarState(CarStateBase):
       ("BodyInfo", 10),
     ]
 
+    if CP.carFingerprint == CAR.IMPREZA:
+      signals += [
+        ("Cruise_On", "CruiseControl", 0),
+        ("Cruise_Activated", "CruiseControl", 0),
+      ]
+
+      checks += [
+        ("CruiseControl", 20),
+      ]
+
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 0)
+
+  @staticmethod
+  def get_bus_one_can_parser(CP):
+    signals = []
+    checks = []
+
+    if CP.carFingerprint == CAR.CROSSTREK_HYBRID:
+      signals += [
+        # sig_name, sig_address, default
+        ("Cruise_Activated", "Cruise_Status", 0),
+      ]
+
+      checks += [
+        # sig_address, frequency
+        ("Cruise_Status", 50),
+      ]
+
+    return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 1)
 
   @staticmethod
   def get_cam_can_parser(CP):
     signals = [
       ("Cruise_Set_Speed", "ES_DashStatus", 0),
-
-      ("Counter", "ES_Distance", 0),
-      ("Signal1", "ES_Distance", 0),
-      ("Signal2", "ES_Distance", 0),
-      ("Main", "ES_Distance", 0),
-      ("Signal3", "ES_Distance", 0),
 
       ("Counter", "ES_LKAS_State", 0),
       ("Keep_Hands_On_Wheel", "ES_LKAS_State", 0),
@@ -143,5 +170,19 @@ class CarState(CarStateBase):
     checks = [
       ("ES_DashStatus", 10),
     ]
+
+    if CP.carFingerprint == CAR.IMPREZA:
+      signals += [
+        ("Counter", "ES_Distance", 0),
+        ("Signal1", "ES_Distance", 0),
+        ("Signal2", "ES_Distance", 0),
+        ("Main", "ES_Distance", 0),
+        ("Signal3", "ES_Distance", 0),
+      ]
+
+    if CP.carFingerprint == CAR.CROSSTREK_HYBRID:
+      signals += [
+        ("Cruise_Activated", "ES_DashStatus", 0),
+      ]
 
     return CANParser(DBC[CP.carFingerprint]['pt'], signals, checks, 2)
