@@ -42,7 +42,7 @@ class CarState(CarStateBase):
     ret.rightBlindspot = cp.vl["BSD_RCTA"]['R_ADJACENT'] == 1
 
     can_gear = int(cp.vl["Transmission"]['Gear'])
-    ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
+    ret.gearShifter = "D" # TODO self.parse_gear_shifter(self.shifter_values.get(can_gear, None))
 
     ret.steeringAngle = cp.vl["Steering_Torque"]['Steering_Angle']
     ret.steeringTorque = cp.vl["Steering_Torque"]['Steer_Torque_Sensor']
