@@ -63,10 +63,12 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
 
   bool unsafe_allow_gas = unsafe_mode & UNSAFE_DISABLE_DISENGAGE_ON_GAS;
 
-  if (valid && (GET_BUS(to_push) == 0)) {
+  int bus = GET_BUS(to_push);
+
+  if (valid) {
     int addr = GET_ADDR(to_push);
-    if (((addr == 0x119) && subaru_global) ||
-        ((addr == 0x371) && !subaru_global)) {
+    if (((addr == 0x119) && (bus == 0) && subaru_global) ||
+        ((addr == 0x371) && (bus == 0) && !subaru_global)) {
       int torque_driver_new;
       if (subaru_global) {
         torque_driver_new = ((GET_BYTES_04(to_push) >> 16) & 0x7FF);
@@ -79,8 +81,8 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     }
 
     // enter controls on rising edge of ACC, exit controls on ACC off
-    if (((addr == 0x240) && subaru_global) ||
-        ((addr == 0x144) && !subaru_global) ||
+    if (((addr == 0x240) && (bus == 0) && subaru_global) ||
+        ((addr == 0x144) && (bus == 0) && !subaru_global) ||
         ((addr == 0x27) && (bus == 1) && subaru_global)) {
       int bit_shift = -1;
 
@@ -99,7 +101,7 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     }
 
     // sample subaru wheel speed, averaging opposite corners
-    if ((addr == 0x13a) && subaru_global) {
+    if ((addr == 0x13a) && (bus == 0) && subaru_global) {
       int subaru_speed = (GET_BYTES_04(to_push) >> 12) & 0x1FFF;  // FR
       subaru_speed += (GET_BYTES_48(to_push) >> 6) & 0x1FFF;  // RL
       subaru_speed /= 2;
@@ -107,7 +109,7 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     }
 
     // exit controls on rising edge of brake press (TODO: missing check for unsupported legacy models)
-    if ((addr == 0x139) && subaru_global) {
+    if ((addr == 0x139) && (bus == 0) && subaru_global) {
       bool brake_pressed = (GET_BYTES_48(to_push) & 0xFFF0) > 0;
       if (brake_pressed && (!brake_pressed_prev || vehicle_moving)) {
         controls_allowed = 0;
@@ -116,8 +118,8 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     }
 
     // exit controls on rising edge of gas press
-    if (((addr == 0x40) && subaru_global) ||
-        ((addr == 0x140) && !subaru_global)) {
+    if (((addr == 0x40) && (bus == 0) && subaru_global) ||
+        ((addr == 0x140) && (bus == 0) && !subaru_global)) {
       int byte = subaru_global ? 4 : 0;
       bool gas_pressed = GET_BYTE(to_push, byte) != 0;
       if (!unsafe_allow_gas && gas_pressed && !gas_pressed_prev) {
@@ -127,7 +129,7 @@ static int subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
     }
 
     if ((safety_mode_cnt > RELAY_TRNS_TIMEOUT) &&
-        (((addr == 0x122) && subaru_global) || ((addr == 0x164) && !subaru_global))) {
+        (((addr == 0x122) && (bus == 0) && subaru_global) || ((addr == 0x164) && (bus == 0) && !subaru_global))) {
       relay_malfunction_set();
     }
   }
