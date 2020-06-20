@@ -20,6 +20,7 @@ AddrCheckStruct subaru_rx_checks[] = {
   {.msg = {{0x139, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}}},
   {.msg = {{0x13a, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 20000U}}},
   {.msg = {{0x240, 0, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 50000U}}},
+  {.msg = {{ 0x27, 1, 8, .check_checksum = true, .max_counter = 15U, .expected_timestep = 50000U}}},
 };
 // TODO: do checksum and counter checks after adding the signals to the outback dbc file
 AddrCheckStruct subaru_l_rx_checks[] = {
