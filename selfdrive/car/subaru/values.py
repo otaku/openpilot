@@ -31,5 +31,5 @@ ECU_FINGERPRINT = {
 
 DBC = {
   CAR.IMPREZA: dbc_dict('subaru_global_2017', None),
-  CAR.CROSSTREK_HYBRID: dbc_dict('subaru_crosstrek_hybrid_2020', None),
+  CAR.CROSSTREK_HYBRID: dbc_dict('subaru_global_crosstrek_hybrid_2020', None),
 }
