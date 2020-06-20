@@ -7,9 +7,9 @@ from selfdrive.car.interfaces import CarInterfaceBase
 
 class CarInterface(CarInterfaceBase):
   def __init__(self, CP, CarController, CarState):
-    super().__init__()
+    super().__init__(CP, CarController, CarState)
 
-    self.bus_one = CarState.get_bus_one_can_parser(CP)
+    self.bus_one = self.CS.get_bus_one_can_parser(CP)
 
   @staticmethod
   def compute_gb(accel, speed):
