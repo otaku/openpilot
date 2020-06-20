@@ -46,12 +46,12 @@ class CarState(CarStateBase):
 
     ret.steeringAngle = cp.vl["Steering_Torque"]['Steering_Angle']
     ret.steeringTorque = cp.vl["Steering_Torque"]['Steer_Torque_Sensor']
-    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD[self.carFingerprint]
+    ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD[self.CP.carFingerprint]
 
-    if self.carFingerprint == CAR.IMPREZA:
+    if self.CP.carFingerprint == CAR.IMPREZA:
       ret.cruiseState.enabled = cp.vl["CruiseControl"]['Cruise_Activated'] != 0
       ret.cruiseState.available = cp.vl["CruiseControl"]['Cruise_On'] != 0
-    elif self.carFingerprint == CAR.CROSSTREK_HYBRID:
+    elif self.CP.carFingerprint == CAR.CROSSTREK_HYBRID:
       ret.cruiseState.enabled = bus_one.vl["Cruise_Status"]['Cruise_Activated'] != 0
       ret.cruiseState.available = bus_one.vl["Cruise_Status"]['Cruise_Activated'] != 0
     ret.cruiseState.speed = cp_cam.vl["ES_DashStatus"]['Cruise_Set_Speed'] * CV.KPH_TO_MS
@@ -65,7 +65,7 @@ class CarState(CarStateBase):
       cp.vl["BodyInfo"]['DOOR_OPEN_FR'],
       cp.vl["BodyInfo"]['DOOR_OPEN_FL']])
 
-    if self.carFingerprint == CAR.IMPREZA:
+    if self.CP.carFingerprint == CAR.IMPREZA:
       self.es_distance_msg = copy.copy(cp_cam.vl["ES_Distance"])
     self.es_lkas_msg = copy.copy(cp_cam.vl["ES_LKAS_State"])
 

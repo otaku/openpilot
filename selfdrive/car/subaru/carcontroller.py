@@ -60,7 +60,7 @@ class CarController():
 
       self.apply_steer_last = apply_steer
 
-    if self.carFingerprint == CAR.IMPREZA and self.es_distance_cnt != CS.es_distance_msg["Counter"]:
+    if self.CP.carFingerprint == CAR.IMPREZA and self.es_distance_cnt != CS.es_distance_msg["Counter"]:
       can_sends.append(subarucan.create_es_distance(self.packer, CS.es_distance_msg, pcm_cancel_cmd))
       self.es_distance_cnt = CS.es_distance_msg["Counter"]
 
