@@ -29,6 +29,7 @@ class CarController():
     # an appropriate CAN bus number.
     self.params = CarControllerParams()
     self.packer = CANPacker(DBC[CP.carFingerprint]['pt'])
+    self.car_fingerprint = CP.carFingerprint
 
   def update(self, enabled, CS, frame, actuators, pcm_cancel_cmd, visual_alert, left_line, right_line):
     """ Controls thread """
